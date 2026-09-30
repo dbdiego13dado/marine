@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "admin_nav.html" %}
+
+<section class="panel">
+  <h1>{{ marina.name if marina else t("dashboard") }}</h1>
+  <p>{{ marina.city }}, {{ marina.country }} · {{ marina.default_currency }} · {{ marina.timezone }}</p>
+</section>
+{% if summary %}
+<section class="grid">
+  <div class="metric"><span>{{ t("berths") }}</span><strong>{{ summary.total_berths }}</strong></div>
+  <div class="metric"><span>{{ t("available") }}</span><strong>{{ summary.available_berths }}</strong></div>
+  <div class="metric"><span>{{ t("occupied") }}</span><strong>{{ summary.occupied_berths }}</strong></div>
+  <div class="metric"><span>{{ t("maintenance") }}</span><strong>{{ summary.maintenance_berths }}</strong></div>
+  <div class="metric"><span>{{ t("pending") }}</span><strong>{{ summary.pending_bookings }}</strong></div>
+  <div class="metric"><span>{{ t("confirmed") }}</span><strong>{{ summary.confirmed_bookings }}</strong></div>
+  <div class="metric"><span>{{ t("unpaid") }}</span><strong>{{ summary.unpaid_bookings }}</strong></div>
+  <div class="metric"><span>{{ t("revenue") }}</span><strong>{{ "%.2f"|format(summary.monthly_revenue_mock) }} {{ summary.currency }}</strong></div>
+</section>
+{% endif %}
+{% endblock %}

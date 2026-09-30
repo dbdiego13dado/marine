@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Icona Prenotazioni Imbarcazioni</title>
+  <desc id="desc">Icona app nautica ad alto contrasto con vela e prua aggressiva.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#03191f"/>
+      <stop offset="48%" stop-color="#064557"/>
+      <stop offset="100%" stop-color="#0b95ad"/>
+    </linearGradient>
+    <linearGradient id="sail" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#9be7ef"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="24" flood-color="#021014" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <circle cx="798" cy="168" r="86" fill="#e94b35"/>
+  <g filter="url(#shadow)">
+    <path d="M468 146 L777 734 L491 604 Z" fill="#03191f"/>
+    <path d="M495 198 L731 684 L522 585 Z" fill="url(#sail)"/>
+    <path d="M452 146 L452 761" stroke="#ffffff" stroke-width="48" stroke-linecap="round"/>
+    <path d="M172 688 C338 612 508 612 846 705 C628 818 362 821 172 688Z" fill="#ffffff"/>
+    <path d="M220 672 H839 L706 824 H326 Z" fill="#062f3a"/>
+    <path d="M270 666 H706 L628 746 H235 Z" fill="#12a0b7"/>
+    <path d="M724 696 C794 694 854 713 908 752 C817 779 751 762 692 724 Z" fill="#e94b35"/>
+  </g>
+  <text x="512" y="908" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="86" font-weight="900" fill="#ffffff" letter-spacing="4">PI</text>
+</svg>

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel receipt-panel">
+  <h1>Ricevuta prenotazione</h1>
+  <div class="success">
+    {% if booking.approval_status == "pending_staff" %}
+    Pagamento registrato. Prenotazione in attesa di approvazione staff.
+    {% else %}
+    Prenotazione confermata e pagamento registrato.
+    {% endif %}
+  </div>
+  <p>Mostra questa ricevuta allo staff se ti viene richiesta conferma del posto barca.</p>
+
+  <div class="receipt-header">
+    <div>
+      <strong>{{ booking.marina.name }}</strong><br>
+      {{ booking.marina.city }}, {{ booking.marina.country }}
+    </div>
+    <div>
+      <strong>Ricevuta #{{ booking.id }}</strong><br>
+      Stato: {{ booking.status }} / {{ booking.payment_status }}
+    </div>
+  </div>
+
+  <dl class="summary-list">
+    <div><dt>Cliente</dt><dd>{{ booking.user.full_name }}</dd></div>
+    <div><dt>Barca</dt><dd>{{ booking.boat.name }} - {{ booking.boat.length_m }} x {{ booking.boat.beam_m }} x {{ booking.boat.draft_m }} m</dd></div>
+    <div><dt>Tipologia</dt><dd>{{ booking.boat.boat_type }}</dd></div>
+    <div><dt>Posto barca</dt><dd>{{ booking.berth_slot.code }}</dd></div>
+    <div><dt>Dimensioni posto</dt><dd>max {{ booking.berth_slot.max_length_m }} x {{ booking.berth_slot.max_beam_m }} x {{ booking.berth_slot.max_draft_m }} m</dd></div>
+    <div><dt>Periodo</dt><dd>{{ booking.start_date }} -> {{ booking.end_date }}</dd></div>
+    <div><dt>Extra servizi</dt><dd>{% if booking.extra_services %}{% for line in booking.extra_services %}{{ line.extra_service.name }} x{{ line.quantity }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}Nessuno{% endif %}</dd></div>
+    <div><dt>Approvazione staff</dt><dd>{{ booking.approval_status }}</dd></div>
+    <div><dt>Totale pagato</dt><dd>{{ booking.total_price }} {{ booking.currency }}</dd></div>
+    {% if payment %}
+    <div><dt>Metodo pagamento</dt><dd>{{ payment.provider }}</dd></div>
+    <div><dt>Riferimento pagamento</dt><dd>{{ payment.provider_reference }}</dd></div>
+    {% endif %}
+  </dl>
+
+  <div class="receipt-note">
+    Questo documento e una ricevuta demo generata da MarinaSuite. In produzione potra essere collegata a pagamento reale, fattura o verifica dello staff.
+  </div>
+  {% if settings and (settings.check_in_start or settings.check_in_end or settings.check_out_time) %}
+  <div class="receipt-note">
+    Regola soggiorno applicata: arrivo
+    {% if settings.check_in_start and settings.check_in_end %}
+    dalle {{ settings.check_in_start }} alle {{ settings.check_in_end }}
+    {% elif settings.check_in_start %}
+    dalle {{ settings.check_in_start }}
+    {% elif settings.check_in_end %}
+    entro le {{ settings.check_in_end }}
+    {% endif %},
+    partenza entro le {{ settings.check_out_time or "11:00" }} del giorno finale.
+  </div>
+  {% endif %}
+
+  <div class="actions no-print">
+    <a class="button" href="/ui/bookings?show_booking={{ booking.id }}">Torna alla home</a>
+    <button type="button" onclick="window.print()">Stampa ricevuta</button>
+    <a class="button secondary" href="/ui/checkout/{{ booking.id }}">Torna al pagamento</a>
+  </div>
+</section>
+{% endblock %}

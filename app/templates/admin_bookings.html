@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "admin_nav.html" %}
+
+<section class="panel">
+  <h1>Gestione prenotazioni</h1>
+  <p>Area riservata ad amministratore e staff. Da qui si controllano prenotazioni, pagamenti e ricevute dei clienti.</p>
+</section>
+
+<section class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Cliente</th>
+        <th>Barca</th>
+        <th>Posto</th>
+        <th>Periodo</th>
+        <th>Totale</th>
+        <th>Stato</th>
+        <th>Approvazione</th>
+        <th>Pagamento</th>
+        <th>Azione</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for booking in bookings %}
+      <tr>
+        <td>#{{ booking.id }}</td>
+        <td>{{ booking.user.full_name }}</td>
+        <td>{{ booking.boat.name }}<br><small>{{ booking.boat.length_m }} x {{ booking.boat.beam_m }} x {{ booking.boat.draft_m }} m</small></td>
+        <td>{{ booking.berth_slot.code }}</td>
+        <td>{{ booking.start_date }} -> {{ booking.end_date }}</td>
+        <td>{{ booking.total_price }} {{ booking.currency }}{% if booking.extra_services_total %}<br><small>extra: {{ booking.extra_services_total }}</small>{% endif %}</td>
+        <td><span class="pill {{ booking.status }}">{{ booking.status }}</span></td>
+        <td><span class="pill {{ 'pending' if booking.approval_status == 'pending_staff' else 'confirmed' }}">{{ booking.approval_status }}</span></td>
+        <td><span class="pill {{ booking.payment_status }}">{{ booking.payment_status }}</span></td>
+        <td>
+          <div class="table-actions">
+            {% if booking.payment_status != "paid" %}
+            <a class="button" href="/ui/checkout/{{ booking.id }}">Registra pagamento</a>
+            {% else %}
+            <a class="button secondary" href="/ui/receipt/{{ booking.id }}">Ricevuta</a>
+            {% endif %}
+            <a class="button secondary" href="/ui/bookings?show_booking={{ booking.id }}">Vedi sulla mappa</a>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="10">Nessuna prenotazione presente.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Waitlist richieste</h2>
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Barca</th>
+          <th>Periodo</th>
+          <th>Misure</th>
+          <th>Zona</th>
+          <th>Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for request in waitlist_requests %}
+        <tr>
+          <td>{{ request.user.full_name if request.user else request.user_id }}</td>
+          <td>{{ request.boat_name }} · {{ request.boat_type }}</td>
+          <td>{{ request.desired_start_date }} -> {{ request.desired_end_date }}</td>
+          <td>{{ request.length_m }} x {{ request.beam_m }} x {{ request.draft_m }} m</td>
+          <td>{{ request.zone.name if request.zone else "-" }}</td>
+          <td><span class="pill pending">{{ request.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">Nessuna richiesta waitlist presente.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</section>
+{% endblock %}

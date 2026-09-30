@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Amministratore</h1>
+  <p>Area riservata per configurare darsena, orari, mappa, posti barca e prenotazioni.</p>
+  {% if saved %}<div class="success">Modifiche salvate.</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+</section>
+
+{% include "admin_nav.html" %}
+
+<section class="admin-grid">
+  <form method="post" action="/admin/marina" class="panel admin-card">
+    <h2>Dati darsena</h2>
+    <div class="form-grid">
+      <label>Nome
+        <input name="name" value="{{ marina.name }}" required>
+      </label>
+      <label>Profilo struttura
+        <select name="structure_type">
+          <option value="marina" {% if marina.structure_type == "marina" %}selected{% endif %}>Marina</option>
+          <option value="yacht_club" {% if marina.structure_type == "yacht_club" %}selected{% endif %}>Circolo nautico</option>
+          <option value="tourist_port" {% if marina.structure_type == "tourist_port" %}selected{% endif %}>Porto turistico</option>
+          <option value="dry_storage" {% if marina.structure_type == "dry_storage" %}selected{% endif %}>Rimessaggio</option>
+        </select>
+      </label>
+      <label>Paese
+        <input name="country" value="{{ marina.country }}" required>
+      </label>
+      <label>Citta
+        <input name="city" value="{{ marina.city }}" required>
+      </label>
+      <label>Indirizzo
+        <input name="address" value="{{ marina.address }}" required>
+      </label>
+      <label>Fuso orario
+        <input name="timezone" value="{{ marina.timezone }}" required>
+      </label>
+      <label>Valuta
+        <select name="default_currency">
+          <option value="EUR" {% if marina.default_currency == "EUR" %}selected{% endif %}>EUR</option>
+          <option value="USD" {% if marina.default_currency == "USD" %}selected{% endif %}>USD</option>
+          <option value="GBP" {% if marina.default_currency == "GBP" %}selected{% endif %}>GBP</option>
+        </select>
+      </label>
+      <label>Slug pubblico
+        <input name="public_slug" value="{{ marina.public_slug or '' }}">
+      </label>
+      <label>Latitudine
+        <input name="latitude" value="{{ marina.latitude or '' }}">
+      </label>
+      <label>Longitudine
+        <input name="longitude" value="{{ marina.longitude or '' }}">
+      </label>
+      <label class="checkbox-line">
+        <input name="active" type="checkbox" value="1" {% if marina.active %}checked{% endif %}>
+        Darsena attiva
+      </label>
+    </div>
+    <label>Descrizione breve
+      <textarea name="short_description">{{ marina.short_description or '' }}</textarea>
+    </label>
+    <label>Descrizione pubblica
+      <textarea name="long_description">{{ marina.long_description or '' }}</textarea>
+    </label>
+    <button type="submit">Salva dati darsena</button>
+  </form>
+
+  <form method="post" action="/admin/settings" class="panel admin-card">
+    <h2>Orari e contatti</h2>
+    <div class="form-grid">
+      <label>Email ufficio
+        <input name="office_email" value="{{ settings.office_email or '' }}">
+      </label>
+      <label>Telefono ufficio
+        <input name="office_phone" value="{{ settings.office_phone or '' }}">
+      </label>
+      <label>Telefono emergenze
+        <input name="emergency_phone" value="{{ settings.emergency_phone or '' }}">
+      </label>
+      <label>Canale VHF
+        <input name="vhf_channel" value="{{ settings.vhf_channel or '' }}">
+      </label>
+      <label>Check-in da
+        <input name="check_in_start" type="time" value="{{ settings.check_in_start or '' }}">
+      </label>
+      <label>Check-in fino a
+        <input name="check_in_end" type="time" value="{{ settings.check_in_end or '' }}">
+      </label>
+      <label>Check-out entro
+        <input name="check_out_time" type="time" value="{{ settings.check_out_time or '' }}">
+      </label>
+    </div>
+    <label>Orari apertura
+      <textarea name="opening_hours">{{ settings.opening_hours or '' }}</textarea>
+    </label>
+    <label>Regole prenotazione
+      <textarea name="booking_terms">{{ settings.booking_terms or '' }}</textarea>
+    </label>
+    <label>Note accesso nautico
+      <textarea name="nautical_access_notes">{{ settings.nautical_access_notes or '' }}</textarea>
+    </label>
+    <label>Fondali e limitazioni
+      <textarea name="seabed_notes">{{ settings.seabed_notes or '' }}</textarea>
+    </label>
+    <label>Note mappa e banchine
+      <textarea name="map_notes">{{ settings.map_notes or '' }}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="checkbox-line">
+        <input name="accepts_catamarans" type="checkbox" value="1" {% if settings.accepts_catamarans %}checked{% endif %}>
+        Accetta catamarani
+      </label>
+      <label class="checkbox-line">
+        <input name="accepts_multihulls" type="checkbox" value="1" {% if settings.accepts_multihulls %}checked{% endif %}>
+        Accetta multiscafi
+      </label>
+    </div>
+    <button type="submit">Salva orari e regole</button>
+  </form>
+
+  <form method="post" action="/admin/rules-pdf" enctype="multipart/form-data" class="panel admin-card">
+    <h2>Regolamento PDF</h2>
+    <p>Carica il regolamento ufficiale della darsena. Il cliente lo vedra nella sua area tramite un pulsante dedicato.</p>
+    {% if settings.rules_pdf_url %}
+    <div class="success">Regolamento caricato: <a href="{{ settings.rules_pdf_url }}" target="_blank" rel="noopener">Apri PDF attuale</a></div>
+    {% endif %}
+    <label>File PDF
+      <input name="rules_pdf" type="file" accept="application/pdf,.pdf" required>
+    </label>
+    <button type="submit">Carica regolamento PDF</button>
+  </form>
+</section>
+
+<section class="admin-grid">
+  <form method="post" action="/admin/services" class="panel admin-card">
+    <h2>Servizi visibili al cliente</h2>
+    <div class="form-grid">
+      <label>Codice<input name="code" required></label>
+      <label>Nome<input name="name" required></label>
+      <label>Categoria<input name="category" value="general"></label>
+      <label class="checkbox-line"><input name="customer_visible" type="checkbox" value="1" checked>Visibile cliente</label>
+      <label class="checkbox-line"><input name="active" type="checkbox" value="1" checked>Attivo</label>
+    </div>
+    <label>Descrizione<textarea name="description"></textarea></label>
+    <button type="submit">Aggiungi servizio</button>
+    <div class="mini-table">
+      <strong>Servizi pubblicati</strong>
+      <ul>
+        {% for service in services %}
+        <li>{{ service.name }} · {{ service.category }} · {{ "cliente" if service.customer_visible else "interno" }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/zones" class="panel admin-card">
+    <h2>Zone struttura</h2>
+    <div class="form-grid">
+      <label>Nome zona<input name="name" required></label>
+      <label>Tipo zona<input name="zone_type" value="general"></label>
+      <label>Colore<input name="color" value="#007c74"></label>
+      <label>Ordine<input name="sort_order" type="number" value="0"></label>
+      <label class="checkbox-line"><input name="customer_visible" type="checkbox" value="1" checked>Visibile cliente</label>
+    </div>
+    <label>Descrizione<textarea name="description"></textarea></label>
+    <button type="submit">Aggiungi zona</button>
+    <div class="mini-table">
+      <strong>Zone attuali</strong>
+      <ul>
+        {% for zone in zones %}
+        <li>{{ zone.name }} · {{ zone.zone_type }} · {{ zone.color }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/photos" class="panel admin-card">
+    <h2>Foto e gallery</h2>
+    <div class="form-grid">
+      <label>Titolo<input name="title" required></label>
+      <label>URL immagine<input name="image_url" required></label>
+      <label>Ordine<input name="sort_order" type="number" value="0"></label>
+      <label class="checkbox-line"><input name="active" type="checkbox" value="1" checked>Attiva</label>
+    </div>
+    <button type="submit">Aggiungi foto</button>
+    <div class="mini-table">
+      <strong>Gallery attuale</strong>
+      <ul>
+        {% for photo in photos %}
+        <li>{{ photo.title }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </form>
+</section>
+
+<section class="admin-grid">
+  <form method="post" action="/admin/extra-services" class="panel admin-card">
+    <h2>Extra prenotazione</h2>
+    <div class="form-grid">
+      <label>Codice<input name="code" required></label>
+      <label>Nome<input name="name" required></label>
+      <label>Prezzo<input name="amount" type="number" step="0.01" required></label>
+      <label>Tariffazione
+        <select name="billing_mode">
+          <option value="per_booking">Per prenotazione</option>
+          <option value="per_day">Per giorno</option>
+        </select>
+      </label>
+      <label class="checkbox-line"><input name="customer_visible" type="checkbox" value="1" checked>Visibile cliente</label>
+      <label class="checkbox-line"><input name="active" type="checkbox" value="1" checked>Attivo</label>
+      <label class="checkbox-line"><input name="requires_staff_approval" type="checkbox" value="1">Richiede approvazione</label>
+    </div>
+    <label>Descrizione<textarea name="description"></textarea></label>
+    <button type="submit">Aggiungi extra</button>
+    <div class="mini-table">
+      <strong>Extra attivi</strong>
+      <ul>
+        {% for service in extra_services %}
+        <li>{{ service.name }} · {{ service.amount }} {{ marina.default_currency }} · {{ service.billing_mode }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/seasonal-rates" class="panel admin-card">
+    <h2>Stagionalita e tariffe</h2>
+    <div class="form-grid">
+      <label>Nome<input name="name" required></label>
+      <label>Zona
+        <select name="zone_id">
+          <option value="">Tutte</option>
+          {% for zone in zones %}
+          <option value="{{ zone.id }}">{{ zone.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Categoria posto
+        <select name="berth_category">
+          <option value="">Tutte</option>
+          <option value="sail">Vela</option>
+          <option value="motor">Motore</option>
+          <option value="catamaran">Catamarano</option>
+          <option value="other">Altro</option>
+        </select>
+      </label>
+      <label>Inizio mese<input name="start_month" type="number" min="1" max="12" value="6"></label>
+      <label>Inizio giorno<input name="start_day" type="number" min="1" max="31" value="1"></label>
+      <label>Fine mese<input name="end_month" type="number" min="1" max="12" value="9"></label>
+      <label>Fine giorno<input name="end_day" type="number" min="1" max="31" value="30"></label>
+      <label>Moltiplicatore giorno<input name="day_multiplier" type="number" step="0.01" value="1"></label>
+      <label>Moltiplicatore settimana<input name="week_multiplier" type="number" step="0.01" value="1"></label>
+      <label>Moltiplicatore mese<input name="month_multiplier" type="number" step="0.01" value="1"></label>
+      <label class="checkbox-line"><input name="active" type="checkbox" value="1" checked>Attiva</label>
+    </div>
+    <button type="submit">Aggiungi stagionalita</button>
+    <div class="mini-table">
+      <strong>Tariffe stagionali</strong>
+      <ul>
+        {% for rate in seasonal_rates %}
+        <li>{{ rate.name }} · {{ rate.start_month }}/{{ rate.start_day }} - {{ rate.end_month }}/{{ rate.end_day }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </form>
+</section>
+
+<section class="admin-grid">
+  <form method="post" action="/admin/map" class="panel admin-card">
+    <h2>Mappa darsena</h2>
+    <p>Modifica immagine e dimensioni tecniche della mappa usata per posizionare i posti barca.</p>
+    <div class="form-grid">
+      <label>Nome mappa
+        <input name="name" value="{{ marina_map.name if marina_map else '' }}" required>
+      </label>
+      <label>URL immagine
+        <input name="image_url" value="{{ marina_map.image_url if marina_map else '/static/marina-map-demo.svg' }}" required>
+      </label>
+      <label>Larghezza riferimento
+        <input name="width" type="number" min="100" value="{{ marina_map.width if marina_map else 1000 }}" required>
+      </label>
+      <label>Altezza riferimento
+        <input name="height" type="number" min="100" value="{{ marina_map.height if marina_map else 620 }}" required>
+      </label>
+    </div>
+    <button type="submit">Salva mappa</button>
+  </form>
+
+  <form method="post" action="/admin/map/position" class="panel admin-card">
+    <h2>Inserisci posizione posto</h2>
+    <p>Aggiungi un posto alla mappa usando coordinate x/y e dimensioni w/h.</p>
+    <div class="form-grid">
+      <label>Posto barca
+        <select name="berth_slot_id" required>
+          {% for berth in berths %}
+          <option value="{{ berth.id }}">{{ berth.code }} - {{ berth.category }} - {{ berth.usage_type }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>X<input name="x" type="number" min="0" value="120" required></label>
+      <label>Y<input name="y" type="number" min="0" value="120" required></label>
+      <label>W<input name="w" type="number" min="10" value="90" required></label>
+      <label>H<input name="h" type="number" min="10" value="54" required></label>
+    </div>
+    <button type="submit">Aggiungi o aggiorna posizione</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Modifica posizioni sulla mappa</h2>
+  <p>Questi valori spostano i rettangoli cliccabili sulla mappa della darsena.</p>
+  <form method="post" action="/admin/map/positions">
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Posto</th><th>Categoria</th><th>Destinazione</th><th>X</th><th>Y</th><th>W</th><th>H</th></tr>
+        </thead>
+        <tbody>
+          {% for position in positions %}
+          <tr>
+            <td>{{ position.berth_slot.code }}</td>
+            <td>{{ position.berth_slot.category }}</td>
+            <td>{{ position.berth_slot.usage_type }}</td>
+            <td><input name="position_{{ position.id }}_x" type="number" min="0" value="{{ position.x }}"></td>
+            <td><input name="position_{{ position.id }}_y" type="number" min="0" value="{{ position.y }}"></td>
+            <td><input name="position_{{ position.id }}_w" type="number" min="10" value="{{ position.w }}"></td>
+            <td><input name="position_{{ position.id }}_h" type="number" min="10" value="{{ position.h }}"></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7">Nessuna posizione configurata.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    <button type="submit">Salva posizioni</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Waitlist cliente</h2>
+  <p>Qui vedi le richieste lasciate quando non c'erano posti compatibili disponibili.</p>
+  <section class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Cliente</th><th>Barca</th><th>Periodo</th><th>Misure</th><th>Stato</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        {% for request in waitlist_requests %}
+        <tr>
+          <td>{{ request.user.full_name if request.user else request.user_id }}</td>
+          <td>{{ request.boat_name }} · {{ request.boat_type }}</td>
+          <td>{{ request.desired_start_date }} -> {{ request.desired_end_date }}</td>
+          <td>{{ request.length_m }} x {{ request.beam_m }} x {{ request.draft_m }} m</td>
+          <td><span class="pill pending">{{ request.status }}</span></td>
+          <td>{{ request.notes or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">Nessuna richiesta waitlist.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</section>
+{% endblock %}

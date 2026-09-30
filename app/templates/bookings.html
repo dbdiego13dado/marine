@@ -1,0 +1,778 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Prenotazioni imbarcazione</h1>
+  <p>Inserisci prima i dati dell'imbarcazione. Subito sotto la mappa evidenzia i posti compatibili; poi scegli i giorni dal calendario e procedi con conferma e pagamento.</p>
+  {% if settings and (settings.check_in_start or settings.check_in_end or settings.check_out_time) %}
+  <div class="info-box">
+    <strong>Regola soggiorno e pagamento</strong><br>
+    Arrivo consentito
+    {% if settings.check_in_start and settings.check_in_end %}
+    dalle {{ settings.check_in_start }} alle {{ settings.check_in_end }}
+    {% elif settings.check_in_start %}
+    dalle {{ settings.check_in_start }}
+    {% elif settings.check_in_end %}
+    entro le {{ settings.check_in_end }}
+    {% endif %}.
+    Partenza entro le {{ settings.check_out_time or "11:00" }} del giorno finale.
+    Il conteggio tariffario usa arrivo/partenza: per esempio `2026-06-19 -> 2026-06-21` corrisponde a 2 giorni tariffari.
+  </div>
+  {% endif %}
+  {% if highlighted_booking %}
+  <div class="success">
+    Prenotazione confermata: il posto {{ highlighted_booking.berth_slot.code }} e evidenziato sulla mappa. Puoi mostrare questa schermata allo staff insieme alla ricevuta.
+  </div>
+  <div class="actions booking-proof-actions">
+    <a class="button secondary" href="/ui/receipt/{{ highlighted_booking.id }}">Ricevuta</a>
+  </div>
+  {% endif %}
+  {% if settings and settings.rules_pdf_url %}
+  <div class="actions booking-proof-actions">
+    <a class="button secondary" href="{{ settings.rules_pdf_url }}" target="_blank" rel="noopener">Regolamento darsena</a>
+  </div>
+  {% endif %}
+  <div class="actions booking-proof-actions">
+    <a class="button secondary" href="/marinas/{{ marina.id }}/profile">Scheda porto / darsena / circolo</a>
+    <a class="button secondary" href="/discover">Altre strutture</a>
+  </div>
+  <div class="profile-inline-card">
+    <strong>{{ marina.name }}</strong>
+    <span>{{ marina.structure_type }} · {{ marina.city }}, {{ marina.country }}</span>
+    <p>{{ marina.short_description or "Struttura configurata con mappa, servizi, zone e prenotazioni online." }}</p>
+  </div>
+  {% if services %}
+  <section class="panel inline-panel">
+    <h2>Servizi della struttura</h2>
+    <div class="service-pill-grid">
+      {% for service in services %}
+      <div class="service-pill">
+        <strong>{{ service.name }}</strong>
+        <small>{{ service.description }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if saved %}<div class="success">Richiesta salvata correttamente.</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/ui/bookings" id="booking-form" class="booking-data-form">
+    <h2>Dati imbarcazione</h2>
+    <div class="form-grid">
+      <label>Tipologia imbarcazione
+        <select name="boat_type" id="boat-type-filter">
+          <option value="sail">Vela</option>
+          <option value="motor">Motore</option>
+          <option value="catamaran">Catamarano</option>
+          <option value="other">Altro</option>
+        </select>
+      </label>
+      <label>Nome barca
+        <input name="boat_name" id="boat-name-input" placeholder="Scrivi il nome della barca" required>
+      </label>
+      <label>Lunghezza m<input name="length_m" id="boat-length-input" inputmode="decimal" placeholder="es. 8,60" required></label>
+      <label>Larghezza m<input name="beam_m" id="boat-beam-input" inputmode="decimal" placeholder="es. 3,00" required></label>
+      <label>Pescaggio m<input name="draft_m" id="boat-draft-input" inputmode="decimal" placeholder="es. 1,60" required></label>
+      {% if current_user.role != "customer" %}
+      <label>Cliente
+        <select name="user_id">
+          {% for user in users %}<option value="{{ user.id }}">{{ user.full_name }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+    <div class="form-actions">
+      <button type="button" id="confirm-boat-data">Conferma dati imbarcazione</button>
+      <span id="boat-data-message" class="muted">La mappa si aggiorna in base a tipologia e misure. La conferma ti porta ai posti adatti.</span>
+    </div>
+
+    <input type="hidden" name="start_date" id="start-date">
+    <input type="hidden" name="end_date" id="end-date">
+    <input type="hidden" name="berth_slot_id" id="berth-id-input">
+
+    <select id="berth-select" hidden>
+      <option value="">Scegli un posto sulla mappa</option>
+      {% for berth in berths %}
+      <option
+        value="{{ berth.id }}"
+        data-code="{{ berth.code }}"
+        data-category="{{ berth.category }}"
+        data-length="{{ berth.max_length_m }}"
+        data-beam="{{ berth.max_beam_m }}"
+        data-draft="{{ berth.max_draft_m }}"
+        data-day-price="{{ berth.price_per_day }}"
+        data-week-price="{{ berth.price_per_week }}"
+        data-month-price="{{ berth.price_per_month }}"
+      >{{ berth.code }} - max {{ berth.max_length_m }} x {{ berth.max_beam_m }} x {{ berth.max_draft_m }} m</option>
+      {% endfor %}
+    </select>
+
+    {% if marina_map %}
+    <div class="booking-map" id="booking-map-step">
+      <h2>Mappa disponibilita</h2>
+      <p>Scegli una tipologia dalla legenda o dal campo sopra. Le misure restringono automaticamente i posti selezionabili, evitando di occupare posti troppo grandi quando esiste un posto piu adatto.</p>
+      <p>Demo complessa: 20 posti occasionali prenotabili, 70 posti armatori riservati, 10 posti manutenzione/servizi. Clicca un posto disponibile per vedere dimensioni e fondale.</p>
+      {% if not settings.accepts_catamarans %}
+      <div class="info-box">Questa struttura accetta i catamarani solo previa approvazione dello staff.</div>
+      {% endif %}
+      <div class="legend-horizontal filter-legend" aria-label="Filtro tipologia posto">
+        <button type="button" class="legend-chip active" data-category-filter="sail"><span class="legend-swatch category-sail"></span><strong>Vela</strong></button>
+        <button type="button" class="legend-chip" data-category-filter="motor"><span class="legend-swatch category-motor"></span><strong>Motore</strong></button>
+        <button type="button" class="legend-chip" data-category-filter="catamaran"><span class="legend-swatch category-catamaran"></span><strong>Catamarano</strong></button>
+        <button type="button" class="legend-chip" data-category-filter="other"><span class="legend-swatch category-other"></span><strong>Altro</strong></button>
+        <div class="legend-chip muted-chip"><span class="legend-swatch unavailable"></span><strong>Non disponibile</strong></div>
+      </div>
+
+      <div class="map-shell booking-map-shell">
+        <div class="map-stage">
+          <img src="{{ marina_map.image_url }}" alt="{{ marina_map.name }}">
+          {% for position in marina_map.berth_positions %}
+            {% set berth = position.berth_slot %}
+            <button
+              class="berth-hit category-{{ berth.category }} {{ berth.status }}"
+              type="button"
+              style="left: {{ (position.x / marina_map.width * 100)|round(2) }}%; top: {{ (position.y / marina_map.height * 100)|round(2) }}%; width: {{ (position.w / marina_map.width * 100)|round(2) }}%; height: {{ (position.h / marina_map.height * 100)|round(2) }}%;"
+              data-berth-id="{{ berth.id }}"
+              data-code="{{ berth.code }}"
+              data-status="{{ berth.status }}"
+              data-category="{{ berth.category }}"
+              data-usage-type="{{ berth.usage_type }}"
+              data-length="{{ berth.max_length_m }}"
+              data-beam="{{ berth.max_beam_m }}"
+              data-draft="{{ berth.max_draft_m }}"
+              data-day-price="{{ berth.price_per_day }}"
+              data-week-price="{{ berth.price_per_week }}"
+              data-month-price="{{ berth.price_per_month }}"
+              data-special-approval="{{ '1' if berth.special_approval_required else '0' }}"
+              data-price-label="{{ berth.price_per_day }} {{ marina.default_currency }}/giorno"
+            >
+              <span><strong>{{ berth.code }}</strong></span>
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="berth-workbench">
+        <section class="berth-info-panel">
+          <h2>Caratteristiche del posto</h2>
+          <p id="berth-empty-state">Seleziona un posto sulla mappa per vedere dimensioni, fondale e prezzo.</p>
+          <dl class="summary-list" id="berth-detail-list" hidden>
+            <div><dt>Posto</dt><dd id="detail-code">-</dd></div>
+            <div><dt>Tipologia</dt><dd id="detail-category">-</dd></div>
+            <div><dt>Dimensioni massime</dt><dd id="detail-dimensions">-</dd></div>
+            <div><dt>Fondale / pescaggio max</dt><dd id="detail-draft">-</dd></div>
+            <div><dt>Tariffe</dt><dd id="detail-prices">-</dd></div>
+            <div><dt>Stato</dt><dd id="detail-status">-</dd></div>
+          </dl>
+          <label>Posto barca scelto
+            <input id="selected-berth-label" value="Nessun posto selezionato" readonly>
+          </label>
+        </section>
+
+        <section class="calendar-panel" id="calendar-panel">
+          <div class="calendar-header">
+            <button type="button" class="secondary" id="calendar-prev">Mese precedente</button>
+            <h2 id="calendar-title">Calendario</h2>
+            <button type="button" class="secondary" id="calendar-next">Mese successivo</button>
+          </div>
+          <p id="calendar-helper">Clicca un posto sulla mappa: qui potrai scegliere data di arrivo e data di partenza.</p>
+          <div class="calendar-grid" id="calendar-grid"></div>
+          <label>Periodo scelto
+            <input id="selected-period-label" value="Nessuna data selezionata" readonly>
+          </label>
+        </section>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if extra_services %}
+    <section class="booking-extras">
+      <h2>Servizi extra in prenotazione</h2>
+      <p>Aggiungi servizi opzionali prima di confermare. Alcuni richiedono approvazione staff.</p>
+      <div class="extra-services-grid">
+        {% for service in extra_services %}
+        <label class="extra-service-option">
+          <span class="checkbox-line">
+            <input type="checkbox" name="extra_service_{{ service.id }}" value="1" class="extra-service-toggle">
+            <span>
+              <strong>{{ service.name }}</strong><br>
+              <small>{{ service.description }}</small>
+            </span>
+          </span>
+          <span class="extra-service-meta">
+            <span>{{ service.amount }} {{ marina.default_currency }} / {{ "giorno" if service.billing_mode == "per_day" else "prenotazione" }}</span>
+            {% if service.requires_staff_approval %}
+            <small>richiede approvazione staff</small>
+            {% endif %}
+          </span>
+          <input
+            type="number"
+            min="1"
+            value="1"
+            name="extra_service_quantity_{{ service.id }}"
+            class="extra-service-qty"
+            data-extra-service
+            data-name="{{ service.name }}"
+            data-amount="{{ service.amount }}"
+            data-billing-mode="{{ service.billing_mode }}"
+            data-requires-approval="{{ '1' if service.requires_staff_approval else '0' }}"
+            disabled
+          >
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <label>Note<textarea name="notes"></textarea></label>
+
+    <div class="booking-confirmation" id="booking-confirmation" hidden>
+      <h2>Conferma prenotazione</h2>
+      <p>Controlla i dati prima di bloccare il posto barca. Dopo la conferma passerai alla pagina di pagamento.</p>
+      {% if settings and (settings.check_in_start or settings.check_in_end or settings.check_out_time) %}
+      <div class="info-box compact-box">
+        Arrivo
+        {% if settings.check_in_start and settings.check_in_end %}
+        dalle {{ settings.check_in_start }} alle {{ settings.check_in_end }}
+        {% elif settings.check_in_start %}
+        dalle {{ settings.check_in_start }}
+        {% elif settings.check_in_end %}
+        entro le {{ settings.check_in_end }}
+        {% endif %};
+        partenza entro le {{ settings.check_out_time or "11:00" }}.
+        Il giorno finale vale come uscita, non come giorno pieno aggiuntivo.
+      </div>
+      {% endif %}
+      <dl class="summary-list">
+        <div><dt>Barca</dt><dd id="confirm-boat">-</dd></div>
+        <div><dt>Posto barca</dt><dd id="confirm-berth">-</dd></div>
+        <div><dt>Periodo</dt><dd id="confirm-dates">-</dd></div>
+        <div><dt>Servizi extra</dt><dd id="confirm-extras">Nessun extra</dd></div>
+        <div><dt>Approvazione staff</dt><dd id="confirm-approval">Non necessaria</dd></div>
+        <div><dt>Totale stimato</dt><dd id="confirm-total">-</dd></div>
+      </dl>
+      <button type="submit">Conferma e vai al pagamento</button>
+    </div>
+    <section class="waitlist-box">
+      <h2>Se non trovi posto</h2>
+      <p>Quando tutte le misure compatibili sono occupate puoi lasciare una richiesta in waitlist. Lo staff la vedra nella propria area e potra contattarti.</p>
+      <div class="actions">
+        <button type="submit" formaction="/ui/waitlist" formmethod="post" class="secondary">Entra in waitlist</button>
+      </div>
+      {% if waitlist_requests %}
+      <div class="mini-table">
+        <strong>Le tue ultime richieste</strong>
+        <ul>
+          {% for request in waitlist_requests[:3] %}
+          <li>{{ request.desired_start_date }} -> {{ request.desired_end_date }} · {{ request.boat_name }} · {{ request.status }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </section>
+    <button type="button" id="review-booking">Rivedi e conferma prenotazione</button>
+  </form>
+</section>
+
+<script>
+  const categoryLabels = { sail: "Vela", motor: "Motore", catamaran: "Catamarano", other: "Altro" };
+  const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  const weekdayLabels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+  const boatNameInput = document.getElementById("boat-name-input");
+  const boatTypeFilter = document.getElementById("boat-type-filter");
+  const boatLengthInput = document.getElementById("boat-length-input");
+  const boatBeamInput = document.getElementById("boat-beam-input");
+  const boatDraftInput = document.getElementById("boat-draft-input");
+  const confirmBoatDataButton = document.getElementById("confirm-boat-data");
+  const boatDataMessage = document.getElementById("boat-data-message");
+  const bookingMapStep = document.getElementById("booking-map-step");
+  const berthSelect = document.getElementById("berth-select");
+  const berthIdInput = document.getElementById("berth-id-input");
+  const selectedBerthLabel = document.getElementById("selected-berth-label");
+  const selectedPeriodLabel = document.getElementById("selected-period-label");
+  const startDateInput = document.getElementById("start-date");
+  const endDateInput = document.getElementById("end-date");
+  const reviewButton = document.getElementById("review-booking");
+  const confirmation = document.getElementById("booking-confirmation");
+  const confirmBoat = document.getElementById("confirm-boat");
+  const confirmBerth = document.getElementById("confirm-berth");
+  const confirmDates = document.getElementById("confirm-dates");
+  const confirmExtras = document.getElementById("confirm-extras");
+  const confirmApproval = document.getElementById("confirm-approval");
+  const confirmTotal = document.getElementById("confirm-total");
+  const berthEmptyState = document.getElementById("berth-empty-state");
+  const berthDetailList = document.getElementById("berth-detail-list");
+  const detailCode = document.getElementById("detail-code");
+  const detailCategory = document.getElementById("detail-category");
+  const detailDimensions = document.getElementById("detail-dimensions");
+  const detailDraft = document.getElementById("detail-draft");
+  const detailPrices = document.getElementById("detail-prices");
+  const detailStatus = document.getElementById("detail-status");
+  const calendarTitle = document.getElementById("calendar-title");
+  const calendarPanel = document.getElementById("calendar-panel");
+  const calendarHelper = document.getElementById("calendar-helper");
+  const calendarGrid = document.getElementById("calendar-grid");
+  const calendarPrev = document.getElementById("calendar-prev");
+  const calendarNext = document.getElementById("calendar-next");
+  const berthButtons = Array.from(document.querySelectorAll(".berth-hit"));
+  const categoryFilterButtons = Array.from(document.querySelectorAll("[data-category-filter]"));
+  const extraServiceToggles = Array.from(document.querySelectorAll(".extra-service-toggle"));
+  const extraServiceQtyInputs = Array.from(document.querySelectorAll("[data-extra-service]"));
+  const existingBookings = [
+    {% for booking in availability_bookings %}
+    { id: "{{ booking.id }}", berthId: "{{ booking.berth_slot_id }}", start: "{{ booking.start_date }}", end: "{{ booking.end_date }}" },
+    {% endfor %}
+  ];
+  const highlightedBooking = {% if highlighted_booking %}{
+    id: "{{ highlighted_booking.id }}",
+    berthId: "{{ highlighted_booking.berth_slot_id }}",
+    start: "{{ highlighted_booking.start_date }}",
+    end: "{{ highlighted_booking.end_date }}",
+    boatName: {{ highlighted_booking.boat.name|tojson }},
+    boatType: {{ highlighted_booking.boat.boat_type|tojson }},
+    length: "{{ highlighted_booking.boat.length_m }}",
+    beam: "{{ highlighted_booking.boat.beam_m }}",
+    draft: "{{ highlighted_booking.boat.draft_m }}",
+    status: "{{ highlighted_booking.status }}",
+    paymentStatus: "{{ highlighted_booking.payment_status }}"
+  }{% else %}null{% endif %};
+  let calendarMonth = new Date();
+  calendarMonth.setDate(1);
+
+  function isoDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function numberFromDataset(element, key) {
+    return Number(String(element.dataset[key] || "0").replace(",", "."));
+  }
+
+  function parseLocalNumber(value) {
+    return Number(String(value || "").replace(",", "."));
+  }
+
+  function selectedBoatDimensions() {
+    const length = parseLocalNumber(boatLengthInput.value);
+    const beam = parseLocalNumber(boatBeamInput.value);
+    const draft = parseLocalNumber(boatDraftInput.value);
+    if (!length || !beam || !draft) return null;
+    return { length, beam, draft, category: boatTypeFilter.value };
+  }
+
+  function selectedBoatCriteria() {
+    const dimensions = selectedBoatDimensions();
+    if (dimensions) return dimensions;
+    return { category: boatTypeFilter.value, length: null, beam: null, draft: null };
+  }
+
+  function validateBoatData() {
+    const boatName = boatNameInput.value.trim();
+    const boat = selectedBoatDimensions();
+    if (!boatName) {
+      alert("Scrivi il nome della barca.");
+      boatNameInput.focus();
+      return false;
+    }
+    if (!boat) {
+      alert("Inserisci lunghezza, larghezza e pescaggio della barca.");
+      if (!boatLengthInput.value) boatLengthInput.focus();
+      else if (!boatBeamInput.value) boatBeamInput.focus();
+      else boatDraftInput.focus();
+      return false;
+    }
+    return true;
+  }
+
+  function selectedExtraServices(days = 0) {
+    return extraServiceQtyInputs
+      .filter((input) => !input.disabled && input.closest(".extra-service-option")?.querySelector(".extra-service-toggle")?.checked)
+      .map((input) => {
+        const quantity = Number(input.value || "1");
+        const amount = Number(String(input.dataset.amount || "0").replace(",", "."));
+        const billingMode = input.dataset.billingMode || "per_booking";
+        const units = billingMode === "per_day" ? quantity * Math.max(days, 1) : quantity;
+        return {
+          name: input.dataset.name || "Extra",
+          quantity,
+          amount,
+          billingMode,
+          requiresApproval: input.dataset.requiresApproval === "1",
+          total: units * amount,
+        };
+      });
+  }
+
+  function selectedExtraServicesTotal(days = 0) {
+    return selectedExtraServices(days).reduce((sum, item) => sum + item.total, 0);
+  }
+
+  function selectedExtraServicesLabel(days = 0) {
+    const extras = selectedExtraServices(days);
+    if (!extras.length) return "Nessun extra";
+    return extras.map((item) => item.name + " x" + item.quantity).join(", ");
+  }
+
+  function extrasNeedApproval() {
+    return selectedExtraServices().some((item) => item.requiresApproval);
+  }
+
+  function confirmBoatData() {
+    if (!validateBoatData()) return;
+    if (bookingMapStep) bookingMapStep.hidden = false;
+    boatDataMessage.textContent = "Dati confermati. Ora scegli sulla mappa un posto libero compatibile.";
+    syncCategoryButtons(boatTypeFilter.value);
+    syncMapAvailability();
+    if (bookingMapStep) bookingMapStep.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  function syncCategoryButtons(category) {
+    categoryFilterButtons.forEach((button) => {
+      button.classList.toggle("active", button.dataset.categoryFilter === category);
+    });
+  }
+
+  function setCategoryFilter(category) {
+    boatTypeFilter.value = category;
+    syncCategoryButtons(category);
+    syncMapAvailability();
+    const firstCandidate = berthButtons.find((button) => availabilityState(button, selectedBoatCriteria()).selectable);
+    if (firstCandidate && !selectedBerthButton()) {
+      firstCandidate.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+    }
+  }
+
+  function selectedDateRange() {
+    if (!startDateInput.value || !endDateInput.value) return null;
+    const start = new Date(startDateInput.value + "T00:00:00");
+    const end = new Date(endDateInput.value + "T00:00:00");
+    if (end <= start) return null;
+    return { start, end };
+  }
+
+  function updateSelectedPeriodLabel() {
+    if (startDateInput.value && endDateInput.value) {
+      selectedPeriodLabel.value = startDateInput.value + " -> " + endDateInput.value;
+    } else if (startDateInput.value) {
+      selectedPeriodLabel.value = "Inizio: " + startDateInput.value + " - scegli data fine";
+    } else {
+      selectedPeriodLabel.value = "Nessuna data selezionata";
+    }
+  }
+
+  function isDayBooked(berthId, date) {
+    const dayStart = new Date(date);
+    const dayEnd = new Date(date);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    return existingBookings.some((booking) => {
+      if (highlightedBooking && booking.id === highlightedBooking.id) return false;
+      if (booking.berthId !== String(berthId)) return false;
+      const bookedStart = new Date(booking.start + "T00:00:00");
+      const bookedEnd = new Date(booking.end + "T00:00:00");
+      return bookedStart < dayEnd && bookedEnd > dayStart;
+    });
+  }
+
+  function hasDateOverlap(button) {
+    const range = selectedDateRange();
+    if (!range) return false;
+    return existingBookings.some((booking) => {
+      if (highlightedBooking && booking.id === highlightedBooking.id) return false;
+      if (booking.berthId !== button.dataset.berthId) return false;
+      const bookedStart = new Date(booking.start + "T00:00:00");
+      const bookedEnd = new Date(booking.end + "T00:00:00");
+      return bookedStart < range.end && bookedEnd > range.start;
+    });
+  }
+
+  function fitsBoat(button, boat) {
+    return (
+      boat.length <= numberFromDataset(button, "length") &&
+      boat.beam <= numberFromDataset(button, "beam") &&
+      boat.draft <= numberFromDataset(button, "draft")
+    );
+  }
+
+  function capacityScore(button) {
+    return (
+      numberFromDataset(button, "length") * 1000000 +
+      numberFromDataset(button, "beam") * 1000 +
+      numberFromDataset(button, "draft")
+    );
+  }
+
+  function bestFitScore(boat) {
+    if (!boat || !boat.length || !boat.beam || !boat.draft) return null;
+    const scores = berthButtons
+      .filter((button) => {
+      if (button.dataset.status === "maintenance" || button.dataset.status === "hidden" || button.dataset.status === "occupied") return false;
+      if (button.dataset.usageType !== "transient") return false;
+        if (button.dataset.category !== boat.category) return false;
+        if (!fitsBoat(button, boat)) return false;
+        if (selectedDateRange() && hasDateOverlap(button)) return false;
+        return true;
+      })
+      .map(capacityScore);
+    if (!scores.length) return null;
+    return Math.min(...scores);
+  }
+
+  function isBestFit(button, boat) {
+    const score = bestFitScore(boat);
+    if (score === null) return false;
+    return Math.abs(capacityScore(button) - score) < 0.001;
+  }
+
+  function availabilityState(button, boat) {
+    if (button.dataset.status === "maintenance" || button.dataset.status === "hidden") return { selectable: false, reason: "maintenance" };
+    if (button.dataset.status === "occupied") return { selectable: false, reason: "occupied" };
+    if (button.dataset.usageType === "owner") return { selectable: false, reason: "owner" };
+    if (button.dataset.usageType === "service") return { selectable: false, reason: "service" };
+    if (button.dataset.category !== boat.category) return { selectable: false, reason: "type" };
+    if (!boat.length || !boat.beam || !boat.draft) return { selectable: false, reason: "missing_dimensions" };
+    if (!fitsBoat(button, boat)) {
+      return { selectable: false, reason: "dimensions" };
+    }
+    if (selectedDateRange() && hasDateOverlap(button)) return { selectable: false, reason: "booked" };
+    if (!isBestFit(button, boat)) return { selectable: false, reason: "oversized" };
+    if (!selectedDateRange()) return { selectable: true, reason: "needs_dates" };
+    return { selectable: true, reason: "available" };
+  }
+
+  function selectedBerthButton() {
+    return berthButtons.find((item) => item.dataset.berthId === berthIdInput.value);
+  }
+
+  function selectBerth(berthId, focusCalendar = false) {
+    berthIdInput.value = berthId || "";
+    berthSelect.value = berthId || "";
+    berthButtons.forEach((item) => item.classList.remove("selected"));
+    const button = selectedBerthButton();
+    if (button) {
+      button.classList.add("selected");
+      selectedBerthLabel.value = button.dataset.code;
+      showBerthDetails(button);
+      renderCalendar();
+      calendarPanel.classList.add("calendar-ready");
+      calendarHelper.textContent = "Ora scegli sul calendario i giorni per il posto " + button.dataset.code + ". Primo click: data di inizio. Secondo click: data di fine.";
+      if (focusCalendar) calendarPanel.scrollIntoView({ block: "start", behavior: "smooth" });
+    } else {
+      selectedBerthLabel.value = "Nessun posto selezionato";
+      clearBerthDetails();
+      calendarPanel.classList.remove("calendar-ready");
+      calendarHelper.textContent = "Clicca un posto sulla mappa: qui potrai scegliere data di inizio e data di fine.";
+      renderCalendar();
+    }
+    if (confirmation) confirmation.hidden = true;
+  }
+
+  function clearBerthDetails() {
+    berthEmptyState.hidden = false;
+    berthDetailList.hidden = true;
+  }
+
+  function showBerthDetails(button) {
+    berthEmptyState.hidden = true;
+    berthDetailList.hidden = false;
+    detailCode.textContent = button.dataset.code;
+    detailCategory.textContent = categoryLabels[button.dataset.category] || button.dataset.category;
+    detailDimensions.textContent = button.dataset.length + " x " + button.dataset.beam + " m";
+    detailDraft.textContent = button.dataset.draft + " m";
+    detailPrices.textContent = button.dataset.dayPrice + " {{ marina.default_currency }}/giorno - " + button.dataset.weekPrice + " {{ marina.default_currency }}/settimana - " + button.dataset.monthPrice + " {{ marina.default_currency }}/mese";
+    detailStatus.textContent = availabilityState(button, selectedBoatDimensions()).selectable ? (button.dataset.specialApproval === "1" ? "Prenotabile con approvazione staff" : "Selezionabile") : "Non selezionabile";
+  }
+
+  function syncMapAvailability() {
+    const boat = selectedBoatCriteria();
+    berthButtons.forEach((button) => {
+      const state = availabilityState(button, boat);
+      button.classList.remove("not-compatible", "booked", "needs-dates", "needs-measurements", "admin-unavailable", "oversized", "confirmed-booking", "owner-only", "service-only");
+      if (!state.selectable && state.reason === "booked") button.classList.add("booked");
+      else if (!state.selectable && state.reason === "maintenance") button.classList.add("admin-unavailable");
+      else if (!state.selectable && (state.reason === "owner" || state.reason === "occupied")) button.classList.add("owner-only");
+      else if (!state.selectable && state.reason === "service") button.classList.add("service-only");
+      else if (!state.selectable && state.reason === "missing_dimensions") button.classList.add("needs-measurements");
+      else if (!state.selectable && state.reason === "oversized") button.classList.add("oversized");
+      else if (!state.selectable) button.classList.add("not-compatible");
+      else if (state.reason === "needs_dates") button.classList.add("needs-dates");
+      button.disabled = !state.selectable;
+      if (highlightedBooking && button.dataset.berthId === highlightedBooking.berthId) {
+        button.classList.add("confirmed-booking");
+        button.disabled = false;
+        button.title = button.dataset.code + " - tuo posto confermato";
+      }
+      if (state.selectable && state.reason === "available") button.title = button.dataset.code + " - libero";
+      else if (state.selectable) button.title = button.dataset.code + " - scegli le date per confermare";
+      else if (state.reason === "booked") button.title = button.dataset.code + " - occupato nelle date scelte";
+      else if (state.reason === "maintenance") button.title = button.dataset.code + " - in manutenzione";
+      else if (state.reason === "owner" || state.reason === "occupied") button.title = button.dataset.code + " - riservato agli armatori";
+      else if (state.reason === "service") button.title = button.dataset.code + " - manutenzione o servizi";
+      else if (state.reason === "missing_dimensions") button.title = button.dataset.code + " - inserisci le misure della barca";
+      else if (state.reason === "oversized") button.title = button.dataset.code + " - posto troppo grande: esiste un posto piu adatto";
+      else button.title = button.dataset.code + " - non compatibile";
+    });
+    const selected = selectedBerthButton();
+    if (selected && !availabilityState(selected, boat).selectable) selectBerth("");
+    else if (selected) showBerthDetails(selected);
+    if (confirmation) confirmation.hidden = true;
+    updateSelectedPeriodLabel();
+    renderCalendar();
+  }
+
+  function loadHighlightedBooking() {
+    if (!highlightedBooking) return;
+    boatTypeFilter.value = highlightedBooking.boatType || "other";
+    boatNameInput.value = highlightedBooking.boatName || "";
+    boatLengthInput.value = highlightedBooking.length || "";
+    boatBeamInput.value = highlightedBooking.beam || "";
+    boatDraftInput.value = highlightedBooking.draft || "";
+    startDateInput.value = highlightedBooking.start || "";
+    endDateInput.value = highlightedBooking.end || "";
+    const start = new Date(highlightedBooking.start + "T00:00:00");
+    if (!Number.isNaN(start.getTime())) {
+      calendarMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    }
+    syncCategoryButtons(boatTypeFilter.value);
+    syncMapAvailability();
+    selectBerth(highlightedBooking.berthId, false);
+    updateSelectedPeriodLabel();
+    bookingMapStep.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  function renderCalendar() {
+    const selected = selectedBerthButton();
+    calendarGrid.innerHTML = "";
+    calendarTitle.textContent = selected
+      ? "Calendario posto " + selected.dataset.code + " - " + monthNames[calendarMonth.getMonth()] + " " + calendarMonth.getFullYear()
+      : "Calendario - " + monthNames[calendarMonth.getMonth()] + " " + calendarMonth.getFullYear();
+    weekdayLabels.forEach((label) => {
+      const cell = document.createElement("div");
+      cell.className = "calendar-weekday";
+      cell.textContent = label;
+      calendarGrid.appendChild(cell);
+    });
+    const firstWeekday = (calendarMonth.getDay() + 6) % 7;
+    for (let i = 0; i < firstWeekday; i++) {
+      const blank = document.createElement("div");
+      blank.className = "calendar-day blank";
+      calendarGrid.appendChild(blank);
+    }
+    const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day);
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "calendar-day";
+      cell.textContent = String(day);
+      const dateValue = isoDate(date);
+      const booked = selected && isDayBooked(selected.dataset.berthId, date);
+      const inRange = startDateInput.value && endDateInput.value && dateValue >= startDateInput.value && dateValue < endDateInput.value;
+      if (!selected) cell.classList.add("disabled");
+      if (booked) cell.classList.add("occupied-day");
+      if (dateValue === startDateInput.value) cell.classList.add("selected-start");
+      if (dateValue === endDateInput.value) cell.classList.add("selected-end");
+      if (inRange) cell.classList.add("selected-range");
+      cell.disabled = !selected || booked;
+      cell.addEventListener("click", () => {
+        if (!startDateInput.value || endDateInput.value || dateValue <= startDateInput.value) {
+          startDateInput.value = dateValue;
+          endDateInput.value = "";
+        } else {
+          endDateInput.value = dateValue;
+        }
+        updateSelectedPeriodLabel();
+        syncMapAvailability();
+      });
+      calendarGrid.appendChild(cell);
+    }
+  }
+
+  function calculateEstimatedTotal() {
+    const selected = selectedBerthButton();
+    if (!selected || !startDateInput.value || !endDateInput.value) return null;
+    const start = new Date(startDateInput.value + "T00:00:00");
+    const end = new Date(endDateInput.value + "T00:00:00");
+    const days = Math.round((end - start) / 86400000);
+    if (days <= 0) return null;
+    const months = Math.floor(days / 30);
+    const remainderAfterMonths = days % 30;
+    const weeks = Math.floor(remainderAfterMonths / 7);
+    const dayBlocks = remainderAfterMonths % 7;
+    const berthTotal = months * numberFromDataset(selected, "monthPrice") + weeks * numberFromDataset(selected, "weekPrice") + dayBlocks * numberFromDataset(selected, "dayPrice");
+    const extrasTotal = selectedExtraServicesTotal(days);
+    return { days, berthTotal, extrasTotal, total: berthTotal + extrasTotal };
+  }
+
+  function showBookingConfirmation() {
+    const boatName = boatNameInput.value.trim();
+    const selected = selectedBerthButton();
+    const estimate = calculateEstimatedTotal();
+    if (!validateBoatData()) return;
+    if (!selected) {
+      alert("Scegli prima un posto barca sulla mappa.");
+      if (bookingMapStep) bookingMapStep.hidden = false;
+      return;
+    }
+    if (!estimate) {
+      alert("Scegli data di inizio e data di fine dal calendario.");
+      return;
+    }
+    confirmBoat.textContent = boatName + " - " + (categoryLabels[boatTypeFilter.value] || boatTypeFilter.value) + " - " + boatLengthInput.value + " x " + boatBeamInput.value + " x " + boatDraftInput.value + " m";
+    confirmBerth.textContent = selected.dataset.code + " - max " + selected.dataset.length + " x " + selected.dataset.beam + " x " + selected.dataset.draft + " m";
+    confirmDates.textContent = startDateInput.value + " -> " + endDateInput.value + " (" + estimate.days + " giorni)";
+    confirmExtras.textContent = selectedExtraServicesLabel(estimate.days);
+    confirmApproval.textContent = (extrasNeedApproval() || selected.dataset.specialApproval === "1") ? "Necessaria verifica staff" : "Non necessaria";
+    confirmTotal.textContent = estimate.total.toFixed(2) + " {{ marina.default_currency }}";
+    confirmation.hidden = false;
+    confirmation.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  berthButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.disabled) return;
+      selectBerth(button.dataset.berthId, true);
+    });
+  });
+  boatTypeFilter.addEventListener("change", () => setCategoryFilter(boatTypeFilter.value));
+  confirmBoatDataButton.addEventListener("click", confirmBoatData);
+  [boatLengthInput, boatBeamInput, boatDraftInput].forEach((input) => {
+    input.addEventListener("change", () => {
+      selectBerth("");
+      syncMapAvailability();
+    });
+    input.addEventListener("input", () => {
+      selectBerth("");
+      syncMapAvailability();
+    });
+  });
+  categoryFilterButtons.forEach((button) => {
+    button.addEventListener("click", () => setCategoryFilter(button.dataset.categoryFilter));
+  });
+  extraServiceToggles.forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const qty = toggle.closest(".extra-service-option")?.querySelector("[data-extra-service]");
+      if (qty) qty.disabled = !toggle.checked;
+    });
+  });
+  calendarPrev.addEventListener("click", () => {
+    calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+    renderCalendar();
+  });
+  calendarNext.addEventListener("click", () => {
+    calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+    renderCalendar();
+  });
+  reviewButton.addEventListener("click", showBookingConfirmation);
+  document.getElementById("booking-form").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.tagName !== "TEXTAREA") {
+      event.preventDefault();
+      if (bookingMapStep && bookingMapStep.hidden) confirmBoatData();
+    }
+  });
+  syncCategoryButtons(boatTypeFilter.value);
+  syncMapAvailability();
+  loadHighlightedBooking();
+</script>
+{% endblock %}

@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "admin_nav.html" %}
+
+<section class="panel">
+  <h1>Builder mappa darsena</h1>
+  <p>{{ marina.name if marina else "" }}. Trascina i posti sulla planimetria, ridimensionali dall'angolo in basso a destra e salva tutto in un colpo solo.</p>
+  {% if saved %}<div class="success">Layout mappa salvato.</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+</section>
+
+{% if marina_map %}
+<form method="post" action="/admin/map/layout" id="map-builder-form">
+  <input type="hidden" name="layout_payload" id="layout-payload">
+  <input type="hidden" name="removed_ids" id="removed-ids">
+
+  <section class="map-builder-layout">
+    <aside class="panel builder-sidebar">
+      <h2>Libreria posti barca</h2>
+      <p>Clicca “Aggiungi” per portare un posto sulla mappa. Se e gia presente puoi selezionarlo dalla lista o direttamente sulla planimetria.</p>
+      <div class="builder-berth-list" id="builder-berth-list">
+        {% for berth in berths %}
+        <button
+          type="button"
+          class="builder-berth-chip"
+          data-berth-library
+          data-berth-id="{{ berth.id }}"
+          data-code="{{ berth.code }}"
+          data-category="{{ berth.category }}"
+          data-usage-type="{{ berth.usage_type }}"
+          data-zone="{{ berth.zone.name if berth.zone else '' }}"
+          data-zone-id="{{ berth.zone_id or '' }}"
+          data-status="{{ berth.status }}"
+          data-length="{{ berth.max_length_m }}"
+          data-beam="{{ berth.max_beam_m }}"
+          data-draft="{{ berth.max_draft_m }}"
+          data-positioned="{{ '1' if berth.positions|length else '0' }}"
+          data-special-approval="{{ '1' if berth.special_approval_required else '0' }}"
+        >
+          <strong>{{ berth.code }}</strong>
+          <small>{{ berth.category }} · {{ berth.usage_type }}{% if berth.zone %} · {{ berth.zone.name }}{% endif %}</small>
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="builder-sidebar-note">
+        <strong>Consiglio operativo</strong>
+        <p>Per ogni tenant puoi usare un'immagine diversa della darsena e costruire il layout solo sulla sua area, senza toccare le altre marine.</p>
+      </div>
+    </aside>
+
+    <section class="panel builder-main-panel">
+      <div class="builder-toolbar">
+        <div class="actions">
+          <button type="submit">Salva layout</button>
+          <button type="button" class="secondary" id="builder-remove-selected">Rimuovi dalla mappa</button>
+        </div>
+        <p class="muted">Editor visuale per {{ marina_map.width }} x {{ marina_map.height }} px. L'editor numerico resta disponibile in amministrazione come fallback.</p>
+      </div>
+
+      <div class="builder-stage-wrap">
+        <div
+          class="builder-stage"
+          id="builder-stage"
+          data-map-width="{{ marina_map.width }}"
+          data-map-height="{{ marina_map.height }}"
+          style="width: {{ marina_map.width }}px; height: {{ marina_map.height }}px;"
+        >
+          <img src="{{ marina_map.image_url }}" alt="{{ marina_map.name }}">
+          {% for position in marina_map.berth_positions %}
+          {% set berth = position.berth_slot %}
+          <button
+            type="button"
+            class="builder-berth category-{{ berth.category }} {{ berth.status }}"
+            data-map-item
+            data-berth-id="{{ berth.id }}"
+            data-code="{{ berth.code }}"
+            data-category="{{ berth.category }}"
+            data-usage-type="{{ berth.usage_type }}"
+            data-zone="{{ berth.zone.name if berth.zone else '' }}"
+            data-zone-id="{{ berth.zone_id or '' }}"
+            data-status="{{ berth.status }}"
+            data-length="{{ berth.max_length_m }}"
+            data-beam="{{ berth.max_beam_m }}"
+            data-draft="{{ berth.max_draft_m }}"
+            data-special-approval="{{ '1' if berth.special_approval_required else '0' }}"
+            data-x="{{ position.x }}"
+            data-y="{{ position.y }}"
+            data-w="{{ position.w }}"
+            data-h="{{ position.h }}"
+            style="left: {{ position.x }}px; top: {{ position.y }}px; width: {{ position.w }}px; height: {{ position.h }}px;"
+          >
+            <span>{{ berth.code }}</span>
+            <i class="resize-handle" aria-hidden="true"></i>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel builder-inspector">
+      <h2>Ispettore posto</h2>
+      <p id="builder-empty-state">Seleziona un posto sulla mappa o dalla libreria per vedere coordinate, misure e destinazione.</p>
+      <div id="builder-inspector-fields" hidden>
+        <dl class="summary-list compact-summary">
+          <div><dt>Codice</dt><dd id="inspect-code">-</dd></div>
+          <div><dt>Tipologia</dt><dd id="inspect-category">-</dd></div>
+          <div><dt>Destinazione</dt><dd id="inspect-usage">-</dd></div>
+          <div><dt>Zona</dt><dd id="inspect-zone">-</dd></div>
+          <div><dt>Dimensioni posto</dt><dd id="inspect-size">-</dd></div>
+          <div><dt>Stato</dt><dd id="inspect-status">-</dd></div>
+        </dl>
+        <div class="form-grid">
+          <label>X<input type="number" id="inspect-x" min="0"></label>
+          <label>Y<input type="number" id="inspect-y" min="0"></label>
+          <label>W<input type="number" id="inspect-w" min="18"></label>
+          <label>H<input type="number" id="inspect-h" min="18"></label>
+        </div>
+        <div class="builder-sidebar-note">
+          <strong>Uso rapido</strong>
+          <p>Trascina il rettangolo per spostarlo. Trascina il triangolino nell'angolo per ridimensionarlo. Se preferisci puoi rifinire i numeri qui.</p>
+        </div>
+      </div>
+    </aside>
+  </section>
+</form>
+
+<script>
+  const stage = document.getElementById("builder-stage");
+  const form = document.getElementById("map-builder-form");
+  const layoutPayload = document.getElementById("layout-payload");
+  const removedIdsInput = document.getElementById("removed-ids");
+  const libraryButtons = Array.from(document.querySelectorAll("[data-berth-library]"));
+  const removeSelectedButton = document.getElementById("builder-remove-selected");
+  const emptyState = document.getElementById("builder-empty-state");
+  const inspectorFields = document.getElementById("builder-inspector-fields");
+  const inspectCode = document.getElementById("inspect-code");
+  const inspectCategory = document.getElementById("inspect-category");
+  const inspectUsage = document.getElementById("inspect-usage");
+  const inspectZone = document.getElementById("inspect-zone");
+  const inspectSize = document.getElementById("inspect-size");
+  const inspectStatus = document.getElementById("inspect-status");
+  const inspectX = document.getElementById("inspect-x");
+  const inspectY = document.getElementById("inspect-y");
+  const inspectW = document.getElementById("inspect-w");
+  const inspectH = document.getElementById("inspect-h");
+  const mapWidth = Number(stage.dataset.mapWidth || "1000");
+  const mapHeight = Number(stage.dataset.mapHeight || "620");
+
+  const categoryLabels = { sail: "Vela", motor: "Motore", catamaran: "Catamarano", other: "Altro" };
+  const usageLabels = { transient: "Occasionale / prenotabile", owner: "Armatore / riservato", service: "Cantiere / servizi" };
+  const removedIds = new Set();
+  let selectedItem = null;
+  let dragState = null;
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function itemDimensions(item) {
+    return {
+      x: Number(item.dataset.x || "0"),
+      y: Number(item.dataset.y || "0"),
+      w: Number(item.dataset.w || "40"),
+      h: Number(item.dataset.h || "24"),
+    };
+  }
+
+  function paintItem(item) {
+    const { x, y, w, h } = itemDimensions(item);
+    item.style.left = x + "px";
+    item.style.top = y + "px";
+    item.style.width = w + "px";
+    item.style.height = h + "px";
+  }
+
+  function syncLibraryState() {
+    const positionedIds = new Set(Array.from(stage.querySelectorAll("[data-map-item]")).map((item) => item.dataset.berthId));
+    libraryButtons.forEach((button) => {
+      const positioned = positionedIds.has(button.dataset.berthId);
+      button.classList.toggle("is-positioned", positioned);
+      button.querySelector("small").textContent =
+        (button.dataset.category || "") + " · " +
+        (button.dataset.usageType || "") +
+        (button.dataset.zone ? " · " + button.dataset.zone : "") +
+        (positioned ? " · in mappa" : " · aggiungi");
+    });
+  }
+
+  function selectItem(item) {
+    stage.querySelectorAll("[data-map-item]").forEach((node) => node.classList.remove("selected"));
+    selectedItem = item;
+    if (!item) {
+      emptyState.hidden = false;
+      inspectorFields.hidden = true;
+      return;
+    }
+    item.classList.add("selected");
+    emptyState.hidden = true;
+    inspectorFields.hidden = false;
+    inspectCode.textContent = item.dataset.code;
+    inspectCategory.textContent = categoryLabels[item.dataset.category] || item.dataset.category;
+    inspectUsage.textContent = usageLabels[item.dataset.usageType] || item.dataset.usageType;
+    inspectZone.textContent = item.dataset.zone || "-";
+    inspectSize.textContent = item.dataset.length + " x " + item.dataset.beam + " x " + item.dataset.draft + " m";
+    inspectStatus.textContent = item.dataset.status + (item.dataset.specialApproval === "1" ? " · approvazione staff" : "");
+    inspectX.value = item.dataset.x || "0";
+    inspectY.value = item.dataset.y || "0";
+    inspectW.value = item.dataset.w || "40";
+    inspectH.value = item.dataset.h || "24";
+  }
+
+  function attachItemEvents(item) {
+    item.addEventListener("click", () => selectItem(item));
+    item.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      selectItem(item);
+      const handle = event.target.closest(".resize-handle");
+      dragState = {
+        item,
+        mode: handle ? "resize" : "move",
+        startX: event.clientX,
+        startY: event.clientY,
+        original: itemDimensions(item),
+      };
+      document.body.classList.add("is-dragging-map-item");
+    });
+  }
+
+  function createItemFromLibrary(button) {
+    const berthId = button.dataset.berthId;
+    const existing = stage.querySelector(`[data-map-item][data-berth-id="${berthId}"]`);
+    if (existing) {
+      selectItem(existing);
+      existing.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+      return;
+    }
+    removedIds.delete(Number(berthId));
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `builder-berth category-${button.dataset.category} ${button.dataset.status || "available"}`;
+    item.dataset.mapItem = "1";
+    item.dataset.berthId = berthId;
+    item.dataset.code = button.dataset.code;
+    item.dataset.category = button.dataset.category;
+    item.dataset.usageType = button.dataset.usageType;
+    item.dataset.zone = button.dataset.zone || "";
+    item.dataset.zoneId = button.dataset.zoneId || "";
+    item.dataset.status = button.dataset.status || "available";
+    item.dataset.length = button.dataset.length;
+    item.dataset.beam = button.dataset.beam;
+    item.dataset.draft = button.dataset.draft;
+    item.dataset.specialApproval = button.dataset.specialApproval || "0";
+    item.dataset.x = "30";
+    item.dataset.y = String(30 + stage.querySelectorAll("[data-map-item]").length * 8);
+    item.dataset.w = "46";
+    item.dataset.h = "28";
+    item.innerHTML = `<span>${button.dataset.code}</span><i class="resize-handle" aria-hidden="true"></i>`;
+    stage.appendChild(item);
+    paintItem(item);
+    attachItemEvents(item);
+    syncLibraryState();
+    selectItem(item);
+  }
+
+  function removeSelectedItem() {
+    if (!selectedItem) return;
+    removedIds.add(Number(selectedItem.dataset.berthId));
+    selectedItem.remove();
+    selectedItem = null;
+    selectItem(null);
+    syncLibraryState();
+  }
+
+  function updateSelectedFromInspector() {
+    if (!selectedItem) return;
+    const w = clamp(Number(inspectW.value || "18"), 18, mapWidth);
+    const h = clamp(Number(inspectH.value || "18"), 18, mapHeight);
+    const x = clamp(Number(inspectX.value || "0"), 0, mapWidth - w);
+    const y = clamp(Number(inspectY.value || "0"), 0, mapHeight - h);
+    selectedItem.dataset.x = String(Math.round(x));
+    selectedItem.dataset.y = String(Math.round(y));
+    selectedItem.dataset.w = String(Math.round(w));
+    selectedItem.dataset.h = String(Math.round(h));
+    paintItem(selectedItem);
+    selectItem(selectedItem);
+  }
+
+  function syncPayload() {
+    const payload = Array.from(stage.querySelectorAll("[data-map-item]")).map((item) => ({
+      berth_slot_id: Number(item.dataset.berthId),
+      x: Number(item.dataset.x),
+      y: Number(item.dataset.y),
+      w: Number(item.dataset.w),
+      h: Number(item.dataset.h),
+    }));
+    layoutPayload.value = JSON.stringify(payload);
+    removedIdsInput.value = JSON.stringify(Array.from(removedIds));
+  }
+
+  libraryButtons.forEach((button) => {
+    button.addEventListener("click", () => createItemFromLibrary(button));
+  });
+
+  Array.from(stage.querySelectorAll("[data-map-item]")).forEach((item) => {
+    paintItem(item);
+    attachItemEvents(item);
+  });
+
+  [inspectX, inspectY, inspectW, inspectH].forEach((input) => {
+    input.addEventListener("input", updateSelectedFromInspector);
+    input.addEventListener("change", updateSelectedFromInspector);
+  });
+
+  removeSelectedButton.addEventListener("click", removeSelectedItem);
+
+  window.addEventListener("mousemove", (event) => {
+    if (!dragState) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    const item = dragState.item;
+    if (dragState.mode === "move") {
+      const x = clamp(dragState.original.x + dx, 0, mapWidth - dragState.original.w);
+      const y = clamp(dragState.original.y + dy, 0, mapHeight - dragState.original.h);
+      item.dataset.x = String(Math.round(x));
+      item.dataset.y = String(Math.round(y));
+    } else {
+      const w = clamp(dragState.original.w + dx, 18, mapWidth - dragState.original.x);
+      const h = clamp(dragState.original.h + dy, 18, mapHeight - dragState.original.y);
+      item.dataset.w = String(Math.round(w));
+      item.dataset.h = String(Math.round(h));
+    }
+    paintItem(item);
+    if (selectedItem === item) selectItem(item);
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!dragState) return;
+    dragState = null;
+    document.body.classList.remove("is-dragging-map-item");
+  });
+
+  form.addEventListener("submit", () => {
+    syncPayload();
+  });
+
+  syncLibraryState();
+  selectItem(null);
+</script>
+{% else %}
+<section class="panel"><p>Nessuna mappa disponibile.</p></section>
+{% endif %}
+{% endblock %}

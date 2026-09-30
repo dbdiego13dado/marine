@@ -1,0 +1,10 @@
+{% if current_user and current_user.role != "customer" %}
+<nav class="admin-toolbar" aria-label="Navigazione amministratore">
+  <a class="button {% if request.url.path == '/admin/bookings' %}active-admin{% else %}secondary{% endif %}" href="/admin/bookings">Gestione prenotazioni</a>
+  <a class="button {% if request.url.path == '/ui/berths' %}active-admin{% else %}secondary{% endif %}" href="/ui/berths">Gestione posti barca</a>
+  <a class="button {% if request.url.path == '/ui/boats' %}active-admin{% else %}secondary{% endif %}" href="/ui/boats">Barche clienti</a>
+  <a class="button {% if request.url.path == '/map' %}active-admin{% else %}secondary{% endif %}" href="/map">Mappa gestione</a>
+  <a class="button {% if request.url.path == '/dashboard' %}active-admin{% else %}secondary{% endif %}" href="/dashboard">Pannello di controllo</a>
+  <a class="button secondary" href="/marinas/{{ marina.id if marina else current_user.marina_id }}/profile">Scheda pubblica</a>
+</nav>
+{% endif %}

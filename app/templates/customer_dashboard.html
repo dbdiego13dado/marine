@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>{{ t("customer_area") }}</h1>
+  <p>{{ current_user.full_name }} · {{ marina.name if marina else "" }}</p>
+</section>
+<section class="grid">
+  <div class="metric"><span>{{ t("boats") }}</span><strong>{{ boats|length }}</strong></div>
+  <div class="metric"><span>{{ t("bookings") }}</span><strong>{{ bookings|length }}</strong></div>
+  <div class="metric"><span>{{ t("available") }}</span><strong>{{ available_berths|length }}</strong></div>
+</section>
+<section class="panel">
+  <h2>{{ t("new_booking") }}</h2>
+  <p>Scegli tipologia, misure, posto sulla mappa e date.</p>
+  <div class="actions">
+    <a class="button" href="/ui/bookings">{{ t("new_booking") }}</a>
+    <a class="button secondary" href="/marinas/{{ marina.id }}/profile">Scheda struttura</a>
+    {% if settings and settings.rules_pdf_url %}
+    <a class="button secondary" href="{{ settings.rules_pdf_url }}" target="_blank" rel="noopener">Regolamento darsena</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

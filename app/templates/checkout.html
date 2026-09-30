@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Pagamento prenotazione</h1>
+  {% if paid %}
+  <div class="success">
+    Pagamento demo completato.
+    {% if booking.approval_status == "pending_staff" %}
+    La prenotazione resta in attesa di approvazione staff per servizi o posto speciale.
+    {% else %}
+    La prenotazione e confermata.
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if error %}
+  <div class="error">
+    {% if error == "card" %}
+    Inserisci nome intestatario, numero carta e scadenza.
+    {% elif error == "bank" %}
+    Inserisci intestatario, riferimento bonifico e data del bonifico.
+    {% else %}
+    Metodo di pagamento non valido.
+    {% endif %}
+  </div>
+  {% endif %}
+  <p>Riepilogo finale prima del pagamento. In produzione questo passaggio potra aprire Stripe Checkout o registrare un bonifico verificato dallo staff.</p>
+  {% if settings and (settings.check_in_start or settings.check_in_end or settings.check_out_time) %}
+  <div class="info-box">
+    <strong>Come viene conteggiato il soggiorno</strong><br>
+    Arrivo
+    {% if settings.check_in_start and settings.check_in_end %}
+    dalle {{ settings.check_in_start }} alle {{ settings.check_in_end }}
+    {% elif settings.check_in_start %}
+    dalle {{ settings.check_in_start }}
+    {% elif settings.check_in_end %}
+    entro le {{ settings.check_in_end }}
+    {% endif %}.
+    Partenza entro le {{ settings.check_out_time or "11:00" }} del giorno finale.
+    Per questo `19 -> 21` equivale a 2 giorni tariffari, salvo regole diverse impostate dalla darsena.
+  </div>
+  {% endif %}
+  <dl class="summary-list">
+    <div><dt>Prenotazione</dt><dd>#{{ booking.id }}</dd></div>
+    <div><dt>Cliente</dt><dd>{{ booking.user.full_name }}</dd></div>
+    <div><dt>Barca</dt><dd>{{ booking.boat.name }} - {{ booking.boat.length_m }} x {{ booking.boat.beam_m }} x {{ booking.boat.draft_m }} m</dd></div>
+    <div><dt>Posto barca</dt><dd>{{ booking.berth_slot.code }} - max {{ booking.berth_slot.max_length_m }} x {{ booking.berth_slot.max_beam_m }} x {{ booking.berth_slot.max_draft_m }} m</dd></div>
+    <div><dt>Periodo</dt><dd>{{ booking.start_date }} -> {{ booking.end_date }}</dd></div>
+    <div><dt>Extra servizi</dt><dd>{% if booking.extra_services %}{% for line in booking.extra_services %}{{ line.extra_service.name }} x{{ line.quantity }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}Nessuno{% endif %}</dd></div>
+    <div><dt>Totale</dt><dd>{{ booking.total_price }} {{ booking.currency }}</dd></div>
+    <div><dt>Stato prenotazione</dt><dd><span class="pill {{ booking.status }}">{{ booking.status }}</span></dd></div>
+    <div><dt>Approvazione staff</dt><dd><span class="pill {{ 'pending' if booking.approval_status == 'pending_staff' else 'confirmed' }}">{{ booking.approval_status }}</span></dd></div>
+    <div><dt>Stato pagamento</dt><dd><span class="pill {{ booking.payment_status }}">{{ booking.payment_status }}</span></dd></div>
+    {% if payment %}
+    <div><dt>Metodo pagamento</dt><dd>{{ payment.provider }}</dd></div>
+    <div><dt>Riferimento pagamento</dt><dd>{{ payment.provider_reference }}</dd></div>
+    {% endif %}
+  </dl>
+
+  {% if booking.payment_status != "paid" %}
+  <div class="payment-box">
+    <h2>Scegli metodo di pagamento</h2>
+    <form method="post" action="/ui/pay/{{ booking.id }}" id="payment-form">
+      <div class="payment-methods">
+        <label class="method-option">
+          <input type="radio" name="payment_method" value="card" checked>
+          <span>Carta di credito/debito</span>
+        </label>
+        <label class="method-option">
+          <input type="radio" name="payment_method" value="bank_transfer">
+          <span>Bonifico bancario</span>
+        </label>
+      </div>
+
+      <div class="payment-fields" id="card-fields">
+        <h3>Dati carta demo</h3>
+        <p>Non vengono salvati dati reali della carta. La demo registra solo le ultime 4 cifre.</p>
+        <div class="form-grid">
+          <label>Intestatario carta
+            <input name="cardholder_name" autocomplete="cc-name" placeholder="Mario Rossi">
+          </label>
+          <label>Numero carta
+            <input name="card_number" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242">
+          </label>
+          <label>Scadenza
+            <input name="card_expiry" autocomplete="cc-exp" placeholder="12/30">
+          </label>
+          <label>CVV demo
+            <input name="card_cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123">
+          </label>
+        </div>
+      </div>
+
+      <div class="payment-fields" id="bank-fields" hidden>
+        <h3>Dati bonifico</h3>
+        <p>Il cliente inserisce il riferimento del bonifico. Lo staff potra poi verificarlo realmente.</p>
+        <div class="bank-details">
+          <strong>IBAN demo:</strong> IT00 A000 0000 0000 0000 0000 000<br>
+          <strong>Intestato a:</strong> Demo Marina International<br>
+          <strong>Causale:</strong> Prenotazione #{{ booking.id }}
+        </div>
+        <div class="form-grid">
+          <label>Intestatario conto
+            <input name="bank_holder" placeholder="Mario Rossi">
+          </label>
+          <label>Riferimento CRO/TRN
+            <input name="transfer_reference" placeholder="TRN123456789">
+          </label>
+          <label>Data bonifico
+            <input name="transfer_date" type="date">
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Conferma pagamento avvenuto</button>
+        <a class="button secondary" href="/ui/bookings">Torna alle prenotazioni</a>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="actions">
+    <a class="button" href="/ui/bookings?show_booking={{ booking.id }}">Torna alla home</a>
+    <a class="button secondary" href="/ui/receipt/{{ booking.id }}">Ricevuta</a>
+    <a class="button secondary" href="/ui/bookings">Torna alle prenotazioni</a>
+  </div>
+  {% endif %}
+</section>
+
+<script>
+  const methodInputs = Array.from(document.querySelectorAll("input[name='payment_method']"));
+  const cardFields = document.getElementById("card-fields");
+  const bankFields = document.getElementById("bank-fields");
+
+  function syncPaymentFields() {
+    const selected = methodInputs.find((input) => input.checked)?.value || "card";
+    cardFields.hidden = selected !== "card";
+    bankFields.hidden = selected !== "bank_transfer";
+  }
+
+  methodInputs.forEach((input) => input.addEventListener("change", syncPaymentFields));
+  syncPaymentFields();
+</script>
+{% endblock %}

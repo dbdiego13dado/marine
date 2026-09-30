@@ -1,0 +1,61 @@
+{
+  "nome_app": "Prenotazioni Imbarcazioni",
+  "nome_breve": "Prenotazioni",
+  "logo": {
+    "riga_1": "PRENOTAZIONI",
+    "riga_2": "IMBARCAZIONI",
+    "riga_3": "APP"
+  },
+  "home": {
+    "eyebrow": "Gestionale nautico personalizzabile",
+    "titolo": "Registro uscite",
+    "sottotitolo": "App per registrare soci, prenotare imbarcazioni e conservare lo storico delle uscite.",
+    "testo": "Il socio sceglie l'imbarcazione, registra l'uscita e conferma il rientro. Lo storico resta disponibile per l'amministratore."
+  },
+  "etichette": {
+    "persona": "socio",
+    "tessera": "Numero tessera",
+    "quota_annuale": "Il socio e in regola con la quota annuale",
+    "certificato_medico": "Il certificato medico e stato consegnato"
+  },
+  "contatti": {
+    "titolo_telefono": "Segreteria",
+    "telefono_label": "Telefono",
+    "telefono": "+390000000000",
+    "telefono_visibile": "000 0000000",
+    "email": "info@example.com",
+    "luogo": "Indirizzo sede",
+    "citta": "Citta"
+  },
+  "orari": {
+    "titolo": "Orari",
+    "sede_titolo": "Orari sede",
+    "servizio_titolo": "Orari servizio",
+    "feriali": {
+      "giorni": "Lunedi - Venerdi",
+      "apertura": "08:45",
+      "chiusura": "19:00"
+    },
+    "festivi": {
+      "giorni": "Sabato, Domenica",
+      "apertura": "08:15",
+      "chiusura": "19:30"
+    }
+  },
+  "database_nome": "app_cliente.db",
+  "dominio_email_interna": "cliente.local",
+  "codice_amministratore": "cambia-questa-password",
+  "percorso_regolamento": "D:/percorso/del/regolamento.pdf",
+  "categorie_barche": [
+    {
+      "codice": "derive",
+      "etichetta": "Derive",
+      "barche": ["Deriva 1", "Deriva 2", "Deriva 3"]
+    },
+    {
+      "codice": "gommoni",
+      "etichetta": "Gommoni",
+      "barche": ["Gommone 1", "Gommone 2"]
+    }
+  ]
+}

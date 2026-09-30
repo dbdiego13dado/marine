@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="profile-hero">
+    <div>
+      <span class="pill confirmed">{{ marina.structure_type }}</span>
+      <h1>{{ marina.name }}</h1>
+      <p>{{ marina.city }}, {{ marina.country }} · {{ marina.address }}</p>
+      <p>{{ marina.long_description or marina.short_description }}</p>
+      <div class="actions">
+        {% if current_user %}
+        <a class="button" href="/ui/bookings">Prenota posto barca</a>
+        {% else %}
+        <a class="button" href="/login">Accedi per prenotare</a>
+        {% endif %}
+        {% if settings.rules_pdf_url %}
+        <a class="button secondary" href="{{ settings.rules_pdf_url }}" target="_blank" rel="noopener">Regolamento PDF</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="profile-contact-card">
+      <h3>Contatti e accesso</h3>
+      <dl class="summary-list compact-summary">
+        <div><dt>Telefono</dt><dd>{{ settings.office_phone or "-" }}</dd></div>
+        <div><dt>E-mail</dt><dd>{{ settings.office_email or "-" }}</dd></div>
+        <div><dt>VHF</dt><dd>{{ settings.vhf_channel or "-" }}</dd></div>
+        <div><dt>Orari</dt><dd>{{ settings.opening_hours or "-" }}</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+{% if photos %}
+<section class="photo-strip">
+  {% for photo in photos %}
+  <figure class="photo-card">
+    <img src="{{ photo.image_url }}" alt="{{ photo.title }}">
+    <figcaption>{{ photo.title }}</figcaption>
+  </figure>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="profile-columns">
+  <div class="panel">
+    <h2>Servizi disponibili</h2>
+    <div class="service-pill-grid">
+      {% for service in services %}
+      <div class="service-pill">
+        <strong>{{ service.name }}</strong>
+        <small>{{ service.description }}</small>
+      </div>
+      {% else %}
+      <p>Nessun servizio pubblicato.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Note nautiche</h2>
+    <dl class="summary-list compact-summary">
+      <div><dt>Catamarani</dt><dd>{{ "Accettati" if settings.accepts_catamarans else "Solo su richiesta" }}</dd></div>
+      <div><dt>Multiscafi</dt><dd>{{ "Accettati" if settings.accepts_multihulls else "Solo su richiesta" }}</dd></div>
+      <div><dt>Accesso</dt><dd>{{ settings.nautical_access_notes or "-" }}</dd></div>
+      <div><dt>Fondali</dt><dd>{{ settings.seabed_notes or "-" }}</dd></div>
+      <div><dt>Regole</dt><dd>{{ settings.booking_terms or "-" }}</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="profile-columns">
+  <div class="panel">
+    <h2>Zone della struttura</h2>
+    <div class="zone-list">
+      {% for zone in zones %}
+      <div class="zone-card">
+        <span class="legend-swatch" style="color: {{ zone.color }}"></span>
+        <div>
+          <strong>{{ zone.name }}</strong>
+          <p>{{ zone.description or "" }}</p>
+        </div>
+      </div>
+      {% else %}
+      <p>Nessuna zona pubblicata.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Stagionalita demo</h2>
+    <div class="mini-table">
+      <ul>
+        {% for rate in seasonal_rates %}
+        <li>{{ rate.name }} · {{ rate.start_day }}/{{ rate.start_month }} - {{ rate.end_day }}/{{ rate.end_month }}</li>
+        {% else %}
+        <li>Nessuna stagionalita pubblicata.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% if marina_map %}
+  <div class="panel">
+    <h2>Mappa generale</h2>
+    <div class="map-shell compact">
+      <div class="map-stage" style="aspect-ratio: {{ marina_map.width }} / {{ marina_map.height }};">
+        <img src="{{ marina_map.image_url }}" alt="{{ marina_map.name }}">
+        {% for position in marina_map.berth_positions %}
+        <div
+          class="berth-hit category-{{ position.berth_slot.category }} {{ position.berth_slot.status }}"
+          style="left: {{ (position.x / marina_map.width * 100)|round(2) }}%; top: {{ (position.y / marina_map.height * 100)|round(2) }}%; width: {{ (position.w / marina_map.width * 100)|round(2) }}%; height: {{ (position.h / marina_map.height * 100)|round(2) }}%;"
+        >
+          <span><strong>{{ position.berth_slot.code }}</strong></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

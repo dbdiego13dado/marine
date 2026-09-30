@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "admin_nav.html" %}
+
+<section class="panel">
+  <h1>{{ t("berths") }}</h1>
+  <p>{{ marina.name if marina else "" }}</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  {% if current_user.role in ["super_admin", "marina_admin", "staff"] %}
+  <form method="post" action="/ui/berths">
+    <input type="hidden" name="marina_id" value="{{ marina.id }}">
+    <div class="form-grid">
+      <label>Code<input name="code" required></label>
+      <label>Zona
+        <select name="zone_id">
+          <option value="">Nessuna zona</option>
+          {% for zone in zones %}
+          <option value="{{ zone.id }}">{{ zone.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Max length m<input name="max_length_m" type="number" step="0.01" required></label>
+      <label>Max beam m<input name="max_beam_m" type="number" step="0.01" required></label>
+      <label>Max draft m<input name="max_draft_m" type="number" step="0.01" required></label>
+      <label>Category<select name="category"><option>sail</option><option>motor</option><option>catamaran</option><option>other</option></select></label>
+      <label>Destinazione
+        <select name="usage_type">
+          <option value="transient">Occasionali / prenotabili</option>
+          <option value="owner">Armatori / riservati</option>
+          <option value="service">Manutenzione e servizi</option>
+        </select>
+      </label>
+      <label>Stato amministratore
+        <select name="status">
+          <option value="available">Automatico / disponibile</option>
+          <option value="maintenance">In manutenzione</option>
+          <option value="hidden">Nascosto</option>
+        </select>
+      </label>
+      <label>Day price<input name="price_per_day" type="number" step="0.01" required></label>
+      <label>Week price<input name="price_per_week" type="number" step="0.01" required></label>
+      <label>Month price<input name="price_per_month" type="number" step="0.01" required></label>
+      <label class="checkbox-line">
+        <input name="special_approval_required" type="checkbox" value="1">
+        Richiede approvazione staff
+      </label>
+    </div>
+    <label>Notes<textarea name="notes"></textarea></label>
+    <button type="submit">{{ t("new_berth") }}</button>
+  </form>
+  {% endif %}
+</section>
+<section class="table-wrap">
+  <table>
+    <thead><tr><th>Code</th><th>Zona</th><th>Dimensions</th><th>Category</th><th>Destinazione</th><th>Prices</th><th>Approvazione</th><th>{{ t("status") }}</th></tr></thead>
+    <tbody>
+      {% for berth in berths %}
+      <tr>
+        <td>{{ berth.code }}</td>
+        <td>{{ berth.zone.name if berth.zone else "-" }}</td>
+        <td>{{ berth.max_length_m }} x {{ berth.max_beam_m }} x {{ berth.max_draft_m }} m</td>
+        <td>{{ berth.category }}</td>
+        <td>{{ berth.usage_type }}</td>
+        <td>{{ berth.price_per_day }}/day - {{ berth.price_per_week }}/week - {{ berth.price_per_month }}/month</td>
+        <td>{{ "staff" if berth.special_approval_required else "auto" }}</td>
+        <td><span class="pill {{ berth.status }}">{{ berth.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

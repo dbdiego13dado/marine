@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="{{ selected_language or 'it' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t("app_name") }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ t("app_name") }}</a>
+    <nav class="nav">
+      {% if current_user %}
+        <a href="/discover">Strutture</a>
+        <a href="/ui/bookings">Prenotazioni imbarcazione</a>
+        {% if current_user.role != "customer" %}
+          <a href="/admin">Amministratore</a>
+        {% endif %}
+        <details class="nav-menu">
+          <summary>Lingua</summary>
+          <div class="nav-menu-panel language-panel">
+            <form method="post" action="/ui/language">
+              <input type="hidden" name="language" value="it">
+              <input type="hidden" name="next" value="{{ request.url.path }}">
+              <button class="secondary" type="submit">Italiano</button>
+            </form>
+            <form method="post" action="/ui/language">
+              <input type="hidden" name="language" value="en">
+              <input type="hidden" name="next" value="{{ request.url.path }}">
+              <button class="secondary" type="submit">English</button>
+            </form>
+          </div>
+        </details>
+        <form method="post" action="/auth/logout">
+          <button type="submit">Disconnettiti</button>
+        </form>
+      {% else %}
+        <a href="/discover">Strutture</a>
+        <details class="nav-menu">
+          <summary>Lingua</summary>
+          <div class="nav-menu-panel language-panel">
+            <form method="post" action="/ui/language">
+              <input type="hidden" name="language" value="it">
+              <input type="hidden" name="next" value="{{ request.url.path }}">
+              <button class="secondary" type="submit">Italiano</button>
+            </form>
+            <form method="post" action="/ui/language">
+              <input type="hidden" name="language" value="en">
+              <input type="hidden" name="next" value="{{ request.url.path }}">
+              <button class="secondary" type="submit">English</button>
+            </form>
+          </div>
+        </details>
+        <a href="/login">Login</a>
+        <a class="secondary" href="/register">Registro</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="page {% block page_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Scopri marine, porti e circoli</h1>
+  <p>Esplora le strutture attive, confronta servizi, leggi le regole e apri la mappa prima di prenotare.</p>
+</section>
+
+<section class="catalog-grid">
+  {% for marina in marinas %}
+  <article class="panel catalog-card">
+    <div class="catalog-card-header">
+      <div>
+        <h2>{{ marina.name }}</h2>
+        <p>{{ marina.city }}, {{ marina.country }}</p>
+      </div>
+      <span class="pill {{ 'confirmed' if marina.active else 'cancelled' }}">{{ marina.structure_type }}</span>
+    </div>
+    <p>{{ marina.short_description or "Struttura pronta per prenotazioni, servizi e gestione darsena." }}</p>
+    <div class="actions">
+      <a class="button" href="/marinas/{{ marina.id }}/profile">Scheda struttura</a>
+      {% if current_user %}
+      <a class="button secondary" href="/ui/bookings">Prenota posto barca</a>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

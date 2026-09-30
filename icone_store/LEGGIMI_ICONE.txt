@@ -1,0 +1,6 @@
+﻿ICONE APP - PRENOTAZIONI IMBARCAZIONI
+
+File inclusi:
+- icona-appstore-1024.png: icona quadrata 1024x1024 per App Store.
+- icona-playstore-512.png: icona quadrata 512x512 per Play Store.
+- icona-pwa-1024.png: icona da usare anche per installazione web/PWA.

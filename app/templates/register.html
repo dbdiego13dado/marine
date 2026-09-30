@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block page_class %}narrow{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>{{ t("register") }}</h1>
+  <p>Crea un account cliente per prenotare un posto barca.</p>
+  <form method="post" action="/auth/register">
+    <label>Nome completo
+      <input name="full_name" required autocomplete="name">
+    </label>
+    <label>{{ t("email") }}
+      <input name="email" type="email" required autocomplete="email">
+    </label>
+    <label>Password
+      <input name="password" type="password" required minlength="8" autocomplete="new-password">
+    </label>
+    <label>Marina
+      <select name="marina_id">
+        {% for marina in marinas %}
+          <option value="{{ marina.id }}">{{ marina.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Telefono
+      <input name="phone" autocomplete="tel">
+    </label>
+    <label>Lingua
+      <select name="language_preference">
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+      </select>
+    </label>
+    <label>Valuta
+      <select name="currency_preference">
+        <option>EUR</option>
+        <option>USD</option>
+        <option>GBP</option>
+      </select>
+    </label>
+    <p></p>
+    <button type="submit">Registrati</button>
+  </form>
+</section>
+{% endblock %}
